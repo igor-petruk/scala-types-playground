@@ -36,17 +36,16 @@ case class NotLoggable[T](value:T) extends LoggingConfig[T](value)
 
 object MonadMain {
   class LoggableW[T](v:T){
-    def ~[T](format:String) = new CustomMonad(Loggable(v,format))
+    def ~(format:String):CustomMonad[T]  = new CustomMonad(Loggable(v,format))
   }
-  implicit def toLgg[T](value: T) = new LoggableW[T](value)
-  implicit def toNonLgg[T](value: T) = new CustomMonad(new NotLoggable[T](value))
+  implicit def toLgg[T](value: T):LoggableW[T] = new LoggableW[T](value)
+  implicit def toNonLgg[T](value: T):CustomMonad[T] = new CustomMonad(new NotLoggable[T](value))
 
   def main(argv: Array[String]) {
     val c = for{
-      i <- toNonLgg(1)
-      j <- toLgg(2) ~ "Here %s ololo"
-      q <- toNonLgg(3)
-    } yield q
+      _ <- "Welcome" ~ "%s"
+      j <- 2 ~ "Here %s ololo"
+    } yield j
 
     println(c)
   }
