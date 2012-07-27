@@ -1,53 +1,58 @@
+package monads
 
 object Utils{
-  class λAB[A,B](f:A=>B){
+  implicit def toλAB[A,B](f:A=>B) = new {
     def ∘[C](other: B=>C): A=>C = {ξ=>other(f(ξ))}
   }
-  
-  implicit def toλAB[A,B](f:A=>B) = new λAB(f)
 }
 
 trait Monad[M[_]]{
+  def unit[Q](v: Q):M[Q]
+  def bind[A,B](m:M[A])(f:A=>M[B]):M[B]
+}
+
+object Monad{
   import Utils._
 
-  def unit[Q](v: Q):M[Q]
-  def map[A,B](f:A=>B):M[B]=flatMap(f ∘ unit[B])
-  def flatMap[A,B](f:A=>M[B]):M[B]
+  implicit def monadExtra[M[_],A](m:M[A])(implicit monad: Monad[M])=new{
+    def flatMap[B](f:A=>M[B]):M[B]=monad.bind(m)(f)
+    def map[B](f:A=>B) = monad.bind(m)(f ∘ monad.unit)
+  }
+
+  implicit object loggingMonad extends Monad[LoggingConfig]{
+    def unit[Q](v: Q):LoggingConfig[Q] = NotLoggable(v)
+
+    def bind[A, B](m: LoggingConfig[A])(f: (A) => LoggingConfig[B]) = {
+      m match {
+        case Loggable(v,fmt) => println("LOG: " + v.formatted(fmt))
+        case _=>
+      }
+      f(m.data)
+    }
+  }
 }
 
-class CustomMonad[T](value: LoggingConfig[T]) extends Monad[LoggingConfig]{
-  type Me[_] = CustomMonad[T]
-  type MonadConst = LoggingConfig[_]
-
- // def apply():T = value.data
-
-  def unit[Q<:LoggingConfig[Q]](v: Q):CustomMonad[Q] = new CustomMonad(v)
-
-  def flatMap[Q >: T, B](f: (Q) => LoggingConfig[B]) = f(value.data)
-
-  override def toString = "Custom %s monad".format(value)
-}
-
-abstract class LoggingConfig[T](v:T){
+class LoggingConfig[T](v:T){
   val data = v
 }
 case class Loggable[T](value:T, format:String) extends LoggingConfig[T](value)
 case class NotLoggable[T](value:T) extends LoggingConfig[T](value)
 
 object MonadMain {
+  import Monad._
+
   class LoggableW[T](v:T){
-    def ~[T](format:String) = new CustomMonad(Loggable(v,format))
+    def ~(format:String)(implicit m:Monad[LoggingConfig]):LoggingConfig[T] = Loggable(v,format)
+    def ~(implicit m:Monad[LoggingConfig]):LoggingConfig[T] = NotLoggable(v)
   }
-  implicit def toLgg[T](value: T) = new LoggableW[T](value)
-  implicit def toNonLgg[T](value: T) = new CustomMonad(new NotLoggable[T](value))
+  implicit def toLgg[T](value: T):LoggableW[T] = new LoggableW[T](value)
 
   def main(argv: Array[String]) {
     val c = for{
-      i <- toNonLgg(1)
-      j <- toLgg(2) ~ "Here %s ololo"
-      q <- toNonLgg(3)
-    } yield q
+      _ <- 1 ~;
+      j <- 2 ~ "Here %s ololo"
+    } yield j
 
-    println(c)
+    println(c.data)
   }
 }
