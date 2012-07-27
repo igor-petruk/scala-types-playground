@@ -18,6 +18,8 @@ object Monad{
     def flatMap[B](f:A=>M[B]):M[B]=monad.bind(m)(f)
     def map[B](f:A=>B) = monad.bind(m)(f ∘ monad.unit)
   }
+  
+  def lift[M[_],A](v:A)(implicit monad:Monad[M]):M[A] = monad.unit(v)
 
   implicit object loggingMonad extends Monad[LoggingConfig]{
     def unit[Q](v: Q):LoggingConfig[Q] = NotLoggable(v)
@@ -38,18 +40,20 @@ class LoggingConfig[T](v:T){
 case class Loggable[T](value:T, format:String) extends LoggingConfig[T](value)
 case class NotLoggable[T](value:T) extends LoggingConfig[T](value)
 
-object MonadMain {
-  import Monad._
-
+object LoggingConfig{
   class LoggableW[T](v:T){
     def ~(format:String)(implicit m:Monad[LoggingConfig]):LoggingConfig[T] = Loggable(v,format)
-    def ~(implicit m:Monad[LoggingConfig]):LoggingConfig[T] = NotLoggable(v)
   }
   implicit def toLgg[T](value: T):LoggableW[T] = new LoggableW[T](value)
+}
+
+object MonadMain {
+  import Monad._
+  import LoggingConfig._
 
   def main(argv: Array[String]) {
     val c = for{
-      _ <- 1 ~;
+      _ <- lift(2);
       j <- 2 ~ "Here %s ololo"
     } yield j
 
