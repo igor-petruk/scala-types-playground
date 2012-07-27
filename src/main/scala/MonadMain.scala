@@ -53,7 +53,7 @@ object MonadMain {
 
   def main(argv: Array[String]) {
     val c = for{
-      _ <- lift(2);
+      _ <- "Welcome" ~ "%s";
       j <- 2 ~ "Here %s ololo"
     } yield j
 
